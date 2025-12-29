@@ -14,10 +14,23 @@ Show summary table:
 - Passed
 - Failed (with paths and reasons)
 
-If any failures, use AskUserQuestion tool:
-- question: "Save error log?"
-- options: ["Yes, save to .claude/check-rules-log.md", "No"]
+If any failures, MUST use AskUserQuestion tool with:
+```json
+{
+  "questions": [{
+    "question": "Save error log?",
+    "header": "Log",
+    "options": [
+      {"label": "Yes", "description": "Save to .mr-plugins/check-rules/log.md"},
+      {"label": "No", "description": "Skip saving"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
 
-If user says yes, Write the log file with date and failure details.
+If user selects Yes:
+1. Create directory .mr-plugins/check-rules/ if needed
+2. Write log.md with date and failure details
 
-DO NOT offer to fix files. User will fix manually.
+DO NOT offer to fix files.
