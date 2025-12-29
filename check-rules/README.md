@@ -1,14 +1,14 @@
 # Check Rules Plugin
 
-Audit changed files against project rules with parallel batch processing using deterministic hooks to orchestrate AI agents.
+Audit changed files against project rules with parallel batch processing using deterministic hooks.
 
 ## Features
 
 - **Deterministic orchestration** - Bash hooks control the flow, not LLM interpretation
-- **Parallel batch processing** - Up to 10 agents running simultaneously
-- **Token optimized** - Only reports failures, ~98% less output
-- **Scalable** - Handles 100+ files with multi-round execution
-- **Auto-fix workflow** - Option to fix violations after audit
+- **Parallel batch processing** - Up to 10 agents × 10 files = 100 files per part
+- **Token optimized** - Agents return only "OK" or error list (~98% less output)
+- **Scalable** - Manual parts for 100+ files
+- **Error logging** - Save failures to `.mr-plugins/check-rules/log.md`
 
 ## Installation
 
@@ -20,130 +20,104 @@ Audit changed files against project rules with parallel batch processing using d
 ## Usage
 
 ```bash
+# Audit up to 100 files
 /check-rules:audit
+
+# For 100+ files, run additional parts
+/check-rules:audit 2
+/check-rules:audit 3
 ```
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  User: /check-rules:audit                                           │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  UserPromptSubmit Hook (init.sh)                                    │
-│  ─────────────────────────────────────────────────────────────────  │
-│  1. Detects "/check-rules:audit"                                    │
-│  2. git diff + git ls-files → collects modified files               │
-│  3. Groups into batches of 10                                       │
-│  4. Calculates rounds (max 10 batches per round)                    │
-│  5. Creates state file JSON                                         │
-│  6. Injects instructions: "Launch these 10 Task agents"             │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  Claude Main Agent                                                  │
-│  ─────────────────────────────────────────────────────────────────  │
-│  Launches up to 10 rules-auditor in parallel (run_in_background)    │
-│  Waits for TaskOutput from all                                      │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-            ┌───────────────────────┼───────────────────────┐
-            ▼                       ▼                       ▼
-┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
-│  rules-auditor    │   │  rules-auditor    │   │  rules-auditor    │
-│  (haiku)          │   │  (haiku)          │   │  (haiku)          │
-│  ───────────────  │   │  ───────────────  │   │  ───────────────  │
-│  10 files each    │   │  10 files each    │   │  10 files each    │
-│  Reads file       │   │  Reads file       │   │  Reads file       │
-│  (rules injected) │   │  (rules injected) │   │  (rules injected) │
-│  Returns: OK      │   │  Returns: OK      │   │  Returns: FAIL    │
-│  or FAIL + list   │   │  or FAIL + list   │   │  file.ts: error   │
-└───────────────────┘   └───────────────────┘   └───────────────────┘
-            │                       │                       │
-            └───────────────────────┼───────────────────────┘
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  Stop Hook (loop.sh)                                                │
-│  ─────────────────────────────────────────────────────────────────  │
-│  if current_round < total_rounds:                                   │
-│      → "block" + instructions for next round                        │
-│  else:                                                              │
-│      → delete state + "approve" (finish)                            │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                    ┌───────────────┴───────────────┐
-                    ▼                               ▼
-            [More rounds]                   [Last round]
-                    │                               │
-                    ▼                               ▼
-            Loop back to                    Claude shows summary
-            Main Agent                      If FAIL → AskUserQuestion
-                                            → rules-fixer agents
+┌─────────────────────────────────────────────────────────────┐
+│  User: /check-rules:audit                                   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  UserPromptSubmit Hook (init.sh)                            │
+│  ─────────────────────────────────────────────────────────  │
+│  1. Detects "/check-rules:audit [N]"                        │
+│  2. git diff + git ls-files → collects modified files       │
+│  3. Groups into batches of 10 files                         │
+│  4. Injects: "Launch 10 agents with these files"            │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Claude Main Agent                                          │
+│  ─────────────────────────────────────────────────────────  │
+│  Launches up to 10 rules-auditor in parallel                │
+│  Each agent receives 10 files in prompt                     │
+│  Waits for all TaskOutput                                   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  rules-auditor  │ │  rules-auditor  │ │  rules-auditor  │
+│  (haiku)        │ │  (haiku)        │ │  (haiku)        │
+│  ─────────────  │ │  ─────────────  │ │  ─────────────  │
+│  10 files each  │ │  10 files each  │ │  10 files each  │
+│  Returns: OK    │ │  Returns: OK    │ │  Returns: FAIL  │
+│  or FAIL + list │ │  or FAIL + list │ │  file.ts: error │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+          │                   │                   │
+          └───────────────────┼───────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Summary + Log                                              │
+│  ─────────────────────────────────────────────────────────  │
+│  - Shows pass/fail count                                    │
+│  - Lists failed files with reasons                          │
+│  - Asks: Save log to .mr-plugins/check-rules/log.md?        │
+│  - If >100 files: "Run /check-rules:audit 2"                │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Components
 
 | File | Type | Function |
 |------|------|----------|
-| `hooks/hooks.json` | Hook Config | Registers init.sh and loop.sh |
-| `scripts/init.sh` | UserPromptSubmit Hook | Detects command, collects files, creates state, launches round 1 |
-| `scripts/loop.sh` | Stop Hook | Continues rounds or finalizes |
-| `commands/audit.md` | Slash Command | Defines allowed tools and final instructions |
-| `agents/rules-auditor.md` | Subagent (haiku) | Audits batch of files, returns "OK" or "FAIL" |
-| `agents/rules-fixer.md` | Subagent (sonnet) | Fixes identified violations |
+| `hooks/hooks.json` | Hook Config | Registers init.sh |
+| `scripts/init.sh` | UserPromptSubmit Hook | Collects files, builds agent list |
+| `commands/audit.md` | Slash Command | Instructions for main agent |
+| `agents/rules-auditor.md` | Subagent (haiku) | Audits files, returns OK or FAIL |
 
 ## Why Hooks?
 
 **Problem**: LLMs are not deterministic. Asking "read all files from git diff" sometimes gets 5, sometimes 10.
 
-**Solution**: Hooks are bash scripts → 100% deterministic. The hook collects files and **injects** the exact list for Claude to execute.
+**Solution**: Hooks are bash scripts → 100% deterministic.
 
 ```
-Hook (deterministic)       →  "Launch Task for: file1, file2, file3..."
+Hook (deterministic)       →  "Launch 10 agents with these exact files"
 Claude (non-deterministic) →  Executes exactly what was asked
 ```
 
-## Context Optimizations
+## Token Optimizations
 
 | Problem | Solution |
 |---------|----------|
-| 10 agents fill context | Each agent returns only "OK" or errors |
+| Agents fill context | Each returns only "OK" or errors |
 | Listing passed files | Never lists - only reports failures |
-| Subagents can't spawn subagents | Batching: 1 agent processes 10 files sequentially |
-| 100+ files | Multi-round: 10 batches per round, loop via Stop hook |
+| 100+ files | Manual parts: /check-rules:audit 2, 3... |
 
-## State File Schema
-
-```json
-{
-  "files": ["/path/file1.ts", "/path/file2.ts", ...],
-  "total_files": 150,
-  "batch_size": 10,
-  "max_parallel": 10,
-  "total_batches": 15,
-  "total_rounds": 2,
-  "current_round": 1
-}
-```
-
-## Example: 150 Files
+## Example: 250 Files
 
 ```
-Round 1: Launches batches 1-10 (100 files) in parallel
-         Stop hook: current=1, total=2 → block + round 2
+/check-rules:audit      → Part 1: files 1-100 (10 agents × 10 files)
+/check-rules:audit 2    → Part 2: files 101-200
+/check-rules:audit 3    → Part 3: files 201-250
 
-Round 2: Launches batches 11-15 (50 files) in parallel
-         Stop hook: current=2, total=2 → approve + delete state
-
-End: Claude shows "All pass" or lists failures
+Each part shows summary and offers to save log.
 ```
 
 ## Auto-Injection of Rules
 
-When the agent reads a file, Claude Code automatically injects applicable rules based on the `paths:` frontmatter:
+When agent reads a file, Claude Code injects matching rules based on `paths:` frontmatter:
 
 ```markdown
 ---
@@ -153,22 +127,12 @@ paths: packages/types/**
 ## [ ] Use pure types, not Zod
 ```
 
-Agent reads `packages/types/result.ts` → receives file + rules above in context.
-
-## Token Cost
-
-| Scenario | Approximate Tokens |
-|----------|-------------------|
-| 100 files, all OK | ~50 tokens (10x "OK") |
-| 100 files, 3 errors | ~100 tokens (7x "OK" + 3 errors) |
-| Before optimization | ~5000 tokens (listed everything) |
-
-**Reduction: ~98% tokens** in agent output.
+Agent reads `packages/types/result.ts` → receives file + rules in context.
 
 ## Requirements
 
 - Project must have rules in `.claude/rules/` with `## [ ]` checkboxes
-- Rules use frontmatter `paths:` to match files (or `global` for all files)
+- Rules use frontmatter `paths:` to match files
 
 ## Example Rule
 
@@ -188,7 +152,6 @@ paths: src/**/*.ts
 ## 1
 
 \`\`\`typescript
-// Correct: explicit return type + Result pattern
 function getUser(id: string): Result<User> {
   return ok(user)
 }
