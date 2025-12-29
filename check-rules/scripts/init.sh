@@ -15,7 +15,7 @@ fi
 
 BATCH_SIZE=10
 MAX_AGENTS=10
-MAX_FILES=$((BATCH_SIZE * MAX_AGENTS))  # 100 files per part
+MAX_FILES=$((BATCH_SIZE * MAX_AGENTS))
 
 # Collect all files
 TRACKED=$(git diff --name-only HEAD 2>/dev/null | grep -v '^$')
@@ -37,43 +37,39 @@ if [[ $TOTAL_COUNT -eq 0 ]]; then
     exit 0
 fi
 
-# Calculate part range
 START_INDEX=$(( (PART - 1) * MAX_FILES ))
-END_INDEX=$((START_INDEX + MAX_FILES))
 
 if [[ $START_INDEX -ge $TOTAL_COUNT ]]; then
     echo "Part $PART does not exist. Total files: $TOTAL_COUNT"
     exit 0
 fi
 
-# Get files for this part
 FILES=("${ALL_FILES[@]:$START_INDEX:$MAX_FILES}")
 COUNT=${#FILES[@]}
 
 TOTAL_PARTS=$(( (TOTAL_COUNT + MAX_FILES - 1) / MAX_FILES ))
 TOTAL_BATCHES=$(( (COUNT + BATCH_SIZE - 1) / BATCH_SIZE ))
 
-# Build launch instructions
-INSTRUCTIONS="## CHECK-RULES AUDIT - Part $PART/$TOTAL_PARTS\n\n"
-INSTRUCTIONS+="**$COUNT files in $TOTAL_BATCHES batches**\n\n"
-INSTRUCTIONS+="**CRITICAL: Send ONE message with $TOTAL_BATCHES Task tool calls in PARALLEL (run_in_background: true for each):**\n\n"
+# Build clear launch instructions
+INSTRUCTIONS="CHECK-RULES AUDIT Part $PART/$TOTAL_PARTS ($COUNT files)\n\n"
+INSTRUCTIONS+="Launch $TOTAL_BATCHES Task agents in ONE message (run_in_background=true each):\n\n"
 
 for ((batch=0; batch<TOTAL_BATCHES; batch++)); do
     START=$((batch * BATCH_SIZE))
 
-    BATCH_FILES=""
-    for ((i=START; i<START+BATCH_SIZE && i<COUNT; i++)); do
-        [[ -n "$BATCH_FILES" ]] && BATCH_FILES="$BATCH_FILES, "
-        BATCH_FILES="$BATCH_FILES${FILES[$i]}"
-    done
+    INSTRUCTIONS+="Agent $((batch+1)): subagent_type=rules-auditor, model=haiku\n"
+    INSTRUCTIONS+="Files to audit:\n"
 
-    INSTRUCTIONS+="- Task $((batch+1)): subagent_type=rules-auditor, model=haiku, prompt=\"Audit: $BATCH_FILES\"\n"
+    for ((i=START; i<START+BATCH_SIZE && i<COUNT; i++)); do
+        INSTRUCTIONS+="  - ${FILES[$i]}\n"
+    done
+    INSTRUCTIONS+="\n"
 done
 
-INSTRUCTIONS+="\nWait ALL TaskOutput. Show summary table.\n"
+INSTRUCTIONS+="After ALL launched, wait ALL TaskOutput, show summary.\n"
 
 if [[ $TOTAL_PARTS -gt 1 && $PART -lt $TOTAL_PARTS ]]; then
-    INSTRUCTIONS+="\n**More files remaining.** After this part, run: /check-rules:audit $((PART + 1))"
+    INSTRUCTIONS+="\nMore files: run /check-rules:audit $((PART + 1))"
 fi
 
 cat << EOF
