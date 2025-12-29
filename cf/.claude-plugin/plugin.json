@@ -1,0 +1,20 @@
+{
+  "name": "cf",
+  "description": "Cloudflare platform development. Use PROACTIVELY when building Workers, Durable Objects, Queues, Workflows, AI, Hyperdrive, Containers, Sandbox, Browser Rendering, or using any Cloudflare service.",
+  "version": "1.0.0",
+  "author": {
+    "name": "mriago"
+  },
+  "repository": "https://github.com/MrIago/mr-plugins",
+  "license": "MIT",
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "durable-objects",
+    "queues",
+    "workflows",
+    "hyperdrive",
+    "wrangler",
+    "workers-ai"
+  ]
+}

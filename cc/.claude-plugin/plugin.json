@@ -1,0 +1,20 @@
+{
+  "name": "cc",
+  "description": "Claude Code CLI and SDK reference. Use when building sandbox agents, DO orchestrators, Sandbox SDK integrations, or any programmatic Claude Code execution (headless, streaming, CI/CD).",
+  "version": "1.0.0",
+  "author": {
+    "name": "mriago"
+  },
+  "repository": "https://github.com/MrIago/mr-plugins",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "cli",
+    "sdk",
+    "headless",
+    "sandbox",
+    "plugins",
+    "hooks",
+    "mcp"
+  ]
+}

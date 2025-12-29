@@ -18,6 +18,28 @@
       },
       "keywords": ["audit", "rules", "linting", "code-quality", "batch-processing"],
       "category": "code-quality"
+    },
+    {
+      "name": "cc",
+      "source": "./cc",
+      "description": "Claude Code CLI and SDK reference for programmatic use (headless, sandbox, plugins, hooks, MCP)",
+      "version": "1.0.0",
+      "author": {
+        "name": "mriago"
+      },
+      "keywords": ["claude-code", "cli", "sdk", "headless", "sandbox", "plugins", "hooks", "mcp"],
+      "category": "reference"
+    },
+    {
+      "name": "cf",
+      "source": "./cf",
+      "description": "Cloudflare platform development (Workers, DO, Queues, Workflows, AI, Hyperdrive, Sandbox)",
+      "version": "1.0.0",
+      "author": {
+        "name": "mriago"
+      },
+      "keywords": ["cloudflare", "workers", "durable-objects", "queues", "workflows", "hyperdrive", "wrangler"],
+      "category": "reference"
     }
   ]
 }

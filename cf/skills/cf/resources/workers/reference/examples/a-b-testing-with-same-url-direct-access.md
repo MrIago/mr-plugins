@@ -1,0 +1,200 @@
+# A/B testing with same-URL direct access
+
+
+* JavaScript
+
+  ```js
+  const NAME = "myExampleWorkersABTest";
+
+
+  export default {
+    async fetch(req) {
+      const url = new URL(req.url);
+
+
+      // Enable Passthrough to allow direct access to control and test routes.
+      if (url.pathname.startsWith("/control") || url.pathname.startsWith("/test"))
+        return fetch(req);
+
+
+      // Determine which group this requester is in.
+      const cookie = req.headers.get("cookie");
+
+
+      if (cookie && cookie.includes(`${NAME}=control`)) {
+        url.pathname = "/control" + url.pathname;
+      } else if (cookie && cookie.includes(`${NAME}=test`)) {
+        url.pathname = "/test" + url.pathname;
+      } else {
+        // If there is no cookie, this is a new client. Choose a group and set the cookie.
+        const group = Math.random() < 0.5 ? "test" : "control"; // 50/50 split
+        if (group === "control") {
+          url.pathname = "/control" + url.pathname;
+        } else {
+          url.pathname = "/test" + url.pathname;
+        }
+        // Reconstruct response to avoid immutability
+        let res = await fetch(url);
+        res = new Response(res.body, res);
+        // Set cookie to enable persistent A/B sessions.
+        res.headers.append("Set-Cookie", `${NAME}=${group}; path=/`);
+        return res;
+      }
+      return fetch(url);
+    },
+  };
+  ```
+
+* TypeScript
+
+  ```ts
+  const NAME = "myExampleWorkersABTest";
+
+
+  export default {
+    async fetch(req): Promise<Response> {
+      const url = new URL(req.url);
+      // Enable Passthrough to allow direct access to control and test routes.
+      if (url.pathname.startsWith("/control") || url.pathname.startsWith("/test"))
+        return fetch(req);
+      // Determine which group this requester is in.
+      const cookie = req.headers.get("cookie");
+      if (cookie && cookie.includes(`${NAME}=control`)) {
+        url.pathname = "/control" + url.pathname;
+      } else if (cookie && cookie.includes(`${NAME}=test`)) {
+        url.pathname = "/test" + url.pathname;
+      } else {
+        // If there is no cookie, this is a new client. Choose a group and set the cookie.
+        const group = Math.random() < 0.5 ? "test" : "control"; // 50/50 split
+        if (group === "control") {
+          url.pathname = "/control" + url.pathname;
+        } else {
+          url.pathname = "/test" + url.pathname;
+        }
+        // Reconstruct response to avoid immutability
+        let res = await fetch(url);
+        res = new Response(res.body, res);
+        // Set cookie to enable persistent A/B sessions.
+        res.headers.append("Set-Cookie", `${NAME}=${group}; path=/`);
+        return res;
+      }
+      return fetch(url);
+    },
+  } satisfies ExportedHandler;
+  ```
+
+* Python
+
+  ```py
+  import random
+  from urllib.parse import urlparse, urlunparse
+  from workers import Response, fetch, WorkerEntrypoint
+
+
+  NAME = "myExampleWorkersABTest"
+
+
+  class Default(WorkerEntrypoint):
+    async def fetch(self, request):
+      url = urlparse(request.url)
+      # Uncomment below when testing locally
+      # url = url._replace(netloc="example.com") if "localhost" in url.netloc else url
+
+
+      # Enable Passthrough to allow direct access to control and test routes.
+      if url.path.startswith("/control") or url.path.startswith("/test"):
+        return fetch(urlunparse(url))
+
+
+      # Determine which group this requester is in.
+      cookie = request.headers.get("cookie")
+
+
+      if cookie and f'{NAME}=control' in cookie:
+        url = url._replace(path="/control" + url.path)
+      elif cookie and f'{NAME}=test' in cookie:
+        url = url._replace(path="/test" + url.path)
+      else:
+        # If there is no cookie, this is a new client. Choose a group and set the cookie.
+        group = "test" if random.random() < 0.5 else "control"
+        if group == "control":
+          url = url._replace(path="/control" + url.path)
+        else:
+          url = url._replace(path="/test" + url.path)
+
+
+        # Reconstruct response to avoid immutability
+        res = await fetch(urlunparse(url))
+        headers = dict(res.headers)
+        headers["Set-Cookie"] = f'{NAME}={group}; path=/'
+        return Response(res.body, headers=headers)
+
+
+      return fetch(urlunparse(url))
+  ```
+
+* Hono
+
+  ```ts
+  import { Hono } from "hono";
+  import { getCookie, setCookie } from "hono/cookie";
+
+
+  const app = new Hono();
+
+
+  const NAME = "myExampleWorkersABTest";
+
+
+  // Enable passthrough to allow direct access to control and test routes
+  app.all("/control/*", (c) => fetch(c.req.raw));
+  app.all("/test/*", (c) => fetch(c.req.raw));
+
+
+  // Middleware to handle A/B testing logic
+  app.use("*", async (c) => {
+    const url = new URL(c.req.url);
+
+
+    // Determine which group this requester is in
+    const abTestCookie = getCookie(c, NAME);
+
+
+    if (abTestCookie === "control") {
+      // User is in control group
+      url.pathname = "/control" + c.req.path;
+    } else if (abTestCookie === "test") {
+      // User is in test group
+      url.pathname = "/test" + c.req.path;
+    } else {
+      // If there is no cookie, this is a new client
+      // Choose a group and set the cookie (50/50 split)
+      const group = Math.random() < 0.5 ? "test" : "control";
+
+
+      // Update URL path based on assigned group
+      if (group === "control") {
+        url.pathname = "/control" + c.req.path;
+      } else {
+        url.pathname = "/test" + c.req.path;
+      }
+
+
+      // Set cookie to enable persistent A/B sessions
+      setCookie(c, NAME, group, {
+        path: "/",
+      });
+    }
+
+
+    const res = await fetch(url);
+
+
+    return c.body(res.body, res);
+  });
+
+
+  export default app;
+  ```
+
+
