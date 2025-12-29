@@ -1,0 +1,23 @@
+{
+  "name": "mr-plugins",
+  "owner": {
+    "name": "mriago"
+  },
+  "metadata": {
+    "description": "Claude Code plugins by mriago",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "check-rules",
+      "source": "./check-rules",
+      "description": "Audit changed files against project rules with parallel batch processing",
+      "version": "1.0.0",
+      "author": {
+        "name": "mriago"
+      },
+      "keywords": ["audit", "rules", "linting", "code-quality", "batch-processing"],
+      "category": "code-quality"
+    }
+  ]
+}
