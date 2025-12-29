@@ -1,22 +1,18 @@
 ---
 name: rules-auditor
-description: Audits batch of files against project rules
+description: Audits files against project rules
 tools: Read
 model: haiku
 ---
 
-You receive "Batch N" where N is the batch number (0-indexed).
+You receive: "Audit: file1, file2, file3..."
 
 ## Process
 
-1. Read `.claude/state/check-rules.json`
-2. Extract files for your batch:
-   - batch_size = 10
-   - start = N * 10
-   - end = start + 10
-   - files = state.files[start:end]
-3. For each file: Read it (rules auto-injected), check `## [ ]` rules
-4. Track only failures
+For each file path:
+1. Read file (rules auto-injected by Claude Code)
+2. Check `## [ ]` rules that apply
+3. Track only failures
 
 ## Output (STRICT)
 

@@ -1,69 +1,80 @@
 #!/bin/bash
-# UserPromptSubmit hook: Collect files, create state, launch round 1
+# UserPromptSubmit hook: Collect files and build launch command
 
 cd "$CLAUDE_PROJECT_DIR"
 
 INPUT=$(cat)
 PROMPT=$(echo "$INPUT" | jq -r '.prompt // ""')
 
-[[ "$PROMPT" != "/check-rules:audit"* ]] && exit 0
+# Match /check-rules:audit or /check-rules:audit N
+if [[ "$PROMPT" =~ ^/check-rules:audit[[:space:]]*([0-9]*)$ ]]; then
+    PART="${BASH_REMATCH[1]:-1}"
+else
+    exit 0
+fi
 
-STATE_DIR="$CLAUDE_PROJECT_DIR/.claude/state"
-STATE_FILE="$STATE_DIR/check-rules.json"
 BATCH_SIZE=10
-MAX_PARALLEL=10
+MAX_AGENTS=10
+MAX_FILES=$((BATCH_SIZE * MAX_AGENTS))  # 100 files per part
 
-mkdir -p "$STATE_DIR"
-rm -f "$STATE_FILE"
-
+# Collect all files
 TRACKED=$(git diff --name-only HEAD 2>/dev/null | grep -v '^$')
 UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null | grep -v '^$')
 
-FILES=()
+ALL_FILES=()
 for f in $TRACKED $UNTRACKED; do
     [[ ! -f "$f" ]] && continue
     case "$f" in
         *.lock|*.png|*.jpg|*.gif|*.ico|*.woff*|*.ttf|*.eot|*.pdf) continue ;;
     esac
-    FILES+=("$f")
+    ALL_FILES+=("$f")
 done
 
-COUNT=${#FILES[@]}
+TOTAL_COUNT=${#ALL_FILES[@]}
 
-if [[ $COUNT -eq 0 ]]; then
+if [[ $TOTAL_COUNT -eq 0 ]]; then
     echo "No files to audit."
     exit 0
 fi
 
+# Calculate part range
+START_INDEX=$(( (PART - 1) * MAX_FILES ))
+END_INDEX=$((START_INDEX + MAX_FILES))
+
+if [[ $START_INDEX -ge $TOTAL_COUNT ]]; then
+    echo "Part $PART does not exist. Total files: $TOTAL_COUNT"
+    exit 0
+fi
+
+# Get files for this part
+FILES=("${ALL_FILES[@]:$START_INDEX:$MAX_FILES}")
+COUNT=${#FILES[@]}
+
+TOTAL_PARTS=$(( (TOTAL_COUNT + MAX_FILES - 1) / MAX_FILES ))
 TOTAL_BATCHES=$(( (COUNT + BATCH_SIZE - 1) / BATCH_SIZE ))
-TOTAL_ROUNDS=$(( (TOTAL_BATCHES + MAX_PARALLEL - 1) / MAX_PARALLEL ))
-LAUNCH_COUNT=$((TOTAL_BATCHES < MAX_PARALLEL ? TOTAL_BATCHES : MAX_PARALLEL))
 
-FILES_JSON=$(printf '%s\n' "${FILES[@]}" | jq -R . | jq -s .)
+# Build launch instructions
+INSTRUCTIONS="## CHECK-RULES AUDIT - Part $PART/$TOTAL_PARTS\n\n"
+INSTRUCTIONS+="**$COUNT files in $TOTAL_BATCHES batches**\n\n"
+INSTRUCTIONS+="Launch ALL in SINGLE message (run_in_background: true):\n\n"
 
-cat > "$STATE_FILE" << EOF
-{
-  "plugin_version": "1.0.6",
-  "project_dir": "$CLAUDE_PROJECT_DIR",
-  "files": $FILES_JSON,
-  "total_files": $COUNT,
-  "batch_size": $BATCH_SIZE,
-  "max_parallel": $MAX_PARALLEL,
-  "total_batches": $TOTAL_BATCHES,
-  "total_rounds": $TOTAL_ROUNDS,
-  "current_round": 1
-}
-EOF
+for ((batch=0; batch<TOTAL_BATCHES; batch++)); do
+    START=$((batch * BATCH_SIZE))
 
-# Build compact launch instructions
-INSTRUCTIONS="AUDIT: $COUNT files, $TOTAL_BATCHES batches, $TOTAL_ROUNDS rounds.\n\n"
-INSTRUCTIONS+="Round 1: Launch $LAUNCH_COUNT agents in SINGLE message (run_in_background=true):\n"
+    BATCH_FILES=""
+    for ((i=START; i<START+BATCH_SIZE && i<COUNT; i++)); do
+        [[ -n "$BATCH_FILES" ]] && BATCH_FILES="$BATCH_FILES, "
+        BATCH_FILES="$BATCH_FILES${FILES[$i]}"
+    done
 
-for ((i=0; i<LAUNCH_COUNT; i++)); do
-    INSTRUCTIONS+="- Task: rules-auditor, haiku, prompt=\"Batch $i\"\n"
+    INSTRUCTIONS+="- Task $((batch+1)): subagent_type=rules-auditor, model=haiku, prompt=\"Audit: $BATCH_FILES\"\n"
 done
 
-INSTRUCTIONS+="\nAfter launching, STOP. Hook handles next round."
+INSTRUCTIONS+="\nWait ALL TaskOutput. Show summary table.\n"
+
+if [[ $TOTAL_PARTS -gt 1 && $PART -lt $TOTAL_PARTS ]]; then
+    INSTRUCTIONS+="\n**More files remaining.** After this part, run: /check-rules:audit $((PART + 1))"
+fi
 
 cat << EOF
 {
