@@ -36,7 +36,14 @@ done
 COUNT=${#FILES[@]}
 
 if [[ $COUNT -eq 0 ]]; then
-    echo "No files to audit. Working tree is clean."
+    cat << 'EOF'
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "No files to audit. Working tree is clean."
+  }
+}
+EOF
     exit 0
 fi
 
@@ -59,14 +66,15 @@ cat > "$STATE_FILE" << EOF
 }
 EOF
 
-echo "## CHECK-RULES AUDIT"
-echo ""
-echo "**$COUNT files | $TOTAL_BATCHES batches | $TOTAL_ROUNDS rounds**"
-echo ""
-echo "### Round 1/$TOTAL_ROUNDS (batches 1-$LAUNCH_COUNT)"
-echo ""
-echo "Launch ALL in SINGLE message (run_in_background: true):"
-echo ""
+# Build instructions
+INSTRUCTIONS="## CHECK-RULES AUDIT\n\n"
+INSTRUCTIONS+="**$COUNT files | $TOTAL_BATCHES batches | $TOTAL_ROUNDS rounds**\n\n"
+INSTRUCTIONS+="### Round 1/$TOTAL_ROUNDS\n\n"
+INSTRUCTIONS+="**CRITICAL INSTRUCTIONS - YOU MUST FOLLOW EXACTLY:**\n\n"
+INSTRUCTIONS+="1. DO NOT run git diff or any file discovery commands\n"
+INSTRUCTIONS+="2. Launch ALL Task agents below in a SINGLE message with run_in_background: true\n"
+INSTRUCTIONS+="3. Wait for ALL TaskOutput before stopping\n\n"
+INSTRUCTIONS+="Launch these Task agents NOW:\n\n"
 
 for ((batch=0; batch<LAUNCH_COUNT; batch++)); do
     START=$((batch * BATCH_SIZE))
@@ -77,16 +85,19 @@ for ((batch=0; batch<LAUNCH_COUNT; batch++)); do
         BATCH_FILES="$BATCH_FILES${FILES[$i]}"
     done
 
-    echo "Task $((batch+1)): rules-auditor"
-    echo "  prompt: \"Audit: $BATCH_FILES\""
-    echo ""
+    INSTRUCTIONS+="- Task $((batch+1)): subagent_type=rules-auditor, model=haiku, prompt=\"Audit these files: $BATCH_FILES\"\n"
 done
 
-echo "After ALL TaskOutput collected, STOP."
-if [[ $TOTAL_ROUNDS -gt 1 ]]; then
-    echo "Stop hook will continue with round 2."
-else
-    echo "Then show summary and ask about fixes."
-fi
+INSTRUCTIONS+="\nAfter ALL TaskOutput collected, STOP and show summary."
+
+# Output JSON with additionalContext
+cat << EOF
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "$INSTRUCTIONS"
+  }
+}
+EOF
 
 exit 0
