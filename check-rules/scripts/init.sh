@@ -56,6 +56,7 @@ FILES_JSON=$(printf '%s\n' "${FILES[@]}" | jq -R . | jq -s .)
 
 cat > "$STATE_FILE" << EOF
 {
+  "plugin_version": "1.0.4",
   "files": $FILES_JSON,
   "total_files": $COUNT,
   "batch_size": $BATCH_SIZE,
@@ -67,14 +68,11 @@ cat > "$STATE_FILE" << EOF
 EOF
 
 # Build instructions
-INSTRUCTIONS="## CHECK-RULES AUDIT\n\n"
+INSTRUCTIONS="<user-prompt-submit-hook>\n"
+INSTRUCTIONS+="## CHECK-RULES AUDIT\n\n"
 INSTRUCTIONS+="**$COUNT files | $TOTAL_BATCHES batches | $TOTAL_ROUNDS rounds**\n\n"
 INSTRUCTIONS+="### Round 1/$TOTAL_ROUNDS\n\n"
-INSTRUCTIONS+="**CRITICAL INSTRUCTIONS - YOU MUST FOLLOW EXACTLY:**\n\n"
-INSTRUCTIONS+="1. DO NOT run git diff or any file discovery commands\n"
-INSTRUCTIONS+="2. Launch ALL Task agents below in a SINGLE message with run_in_background: true\n"
-INSTRUCTIONS+="3. Wait for ALL TaskOutput before stopping\n\n"
-INSTRUCTIONS+="Launch these Task agents NOW:\n\n"
+INSTRUCTIONS+="Launch these Task agents in a SINGLE message (run_in_background: true):\n\n"
 
 for ((batch=0; batch<LAUNCH_COUNT; batch++)); do
     START=$((batch * BATCH_SIZE))
@@ -88,7 +86,8 @@ for ((batch=0; batch<LAUNCH_COUNT; batch++)); do
     INSTRUCTIONS+="- Task $((batch+1)): subagent_type=rules-auditor, model=haiku, prompt=\"Audit these files: $BATCH_FILES\"\n"
 done
 
-INSTRUCTIONS+="\nAfter ALL TaskOutput collected, STOP and show summary."
+INSTRUCTIONS+="\nAfter ALL TaskOutput collected, STOP and show summary.\n"
+INSTRUCTIONS+="</user-prompt-submit-hook>"
 
 # Output JSON with additionalContext
 cat << EOF
