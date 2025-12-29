@@ -1,6 +1,6 @@
 ---
 description: Audit changed files against project rules
-allowed-tools: Task, TaskOutput, Write
+allowed-tools: Task, TaskOutput, Write, AskUserQuestion
 ---
 
 Hook injected agents and files above.
@@ -9,14 +9,15 @@ Launch ALL agents in ONE message (run_in_background=true each).
 
 Wait ALL TaskOutput.
 
-Show summary:
-- Total files audited
-- Pass count
-- Fail count with file paths and reasons
+Show summary table:
+- Total files
+- Passed
+- Failed (with paths and reasons)
 
-If failures exist, ask: "Save error log to .claude/check-rules-log.md?"
+If any failures, use AskUserQuestion tool:
+- question: "Save error log?"
+- options: ["Yes, save to .claude/check-rules-log.md", "No"]
 
-If yes, write markdown file with:
-- Date/time
-- List of failed files with reasons
-- User can review and fix manually later
+If user says yes, Write the log file with date and failure details.
+
+DO NOT offer to fix files. User will fix manually.
