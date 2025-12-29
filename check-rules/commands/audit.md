@@ -3,15 +3,15 @@ description: Audit changed files against project rules
 allowed-tools: Task, TaskOutput, AskUserQuestion
 ---
 
-Hook injected file list and Task commands above.
+Hook injected Task commands above.
 
-Execute ALL Task agents in SINGLE message with run_in_background: true.
+**CRITICAL: Launch ALL agents in ONE response with MULTIPLE Task tool calls in PARALLEL.**
 
-Wait ALL TaskOutput.
+Do NOT launch one agent, wait, then launch another.
+Send SINGLE message with ALL Task invocations at once.
 
-Show summary:
-- Files audited
-- Pass/fail count
-- List failures
+Each Task: subagent_type=rules-auditor, model=haiku, run_in_background=true
 
-If failures, ask: "Fix all at once" or "Fix one by one"
+After ALL launched, wait ALL TaskOutput.
+
+Show summary table. If failures, ask to fix.

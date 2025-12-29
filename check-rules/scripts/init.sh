@@ -56,7 +56,7 @@ TOTAL_BATCHES=$(( (COUNT + BATCH_SIZE - 1) / BATCH_SIZE ))
 # Build launch instructions
 INSTRUCTIONS="## CHECK-RULES AUDIT - Part $PART/$TOTAL_PARTS\n\n"
 INSTRUCTIONS+="**$COUNT files in $TOTAL_BATCHES batches**\n\n"
-INSTRUCTIONS+="Launch ALL in SINGLE message (run_in_background: true):\n\n"
+INSTRUCTIONS+="**CRITICAL: Send ONE message with $TOTAL_BATCHES Task tool calls in PARALLEL (run_in_background: true for each):**\n\n"
 
 for ((batch=0; batch<TOTAL_BATCHES; batch++)); do
     START=$((batch * BATCH_SIZE))
