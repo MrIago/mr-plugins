@@ -1,17 +1,22 @@
 ---
 description: Audit changed files against project rules
-allowed-tools: Task, TaskOutput, AskUserQuestion
+allowed-tools: Task, TaskOutput, Write
 ---
 
-Hook injected Task commands above.
+Hook injected agents and files above.
 
-**CRITICAL: Launch ALL agents in ONE response with MULTIPLE Task tool calls in PARALLEL.**
+Launch ALL agents in ONE message (run_in_background=true each).
 
-Do NOT launch one agent, wait, then launch another.
-Send SINGLE message with ALL Task invocations at once.
+Wait ALL TaskOutput.
 
-Each Task: subagent_type=rules-auditor, model=haiku, run_in_background=true
+Show summary:
+- Total files audited
+- Pass count
+- Fail count with file paths and reasons
 
-After ALL launched, wait ALL TaskOutput.
+If failures exist, ask: "Save error log to .claude/check-rules-log.md?"
 
-Show summary table. If failures, ask to fix.
+If yes, write markdown file with:
+- Date/time
+- List of failed files with reasons
+- User can review and fix manually later
