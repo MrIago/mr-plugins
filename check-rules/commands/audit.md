@@ -29,8 +29,7 @@ If any failures, MUST use AskUserQuestion tool with:
 }
 ```
 
-If user selects Yes:
-1. Create directory .mr-plugins/check-rules/ if needed
-2. Write log.md with date and failure details
+If user selects Yes, use Write tool directly to .mr-plugins/check-rules/log.md (it creates dirs automatically).
 
 DO NOT offer to fix files.
+DO NOT use Bash mkdir - Write tool handles it.

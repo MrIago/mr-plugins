@@ -1,7 +1,7 @@
 {
   "name": "check-rules",
   "description": "Audit changed files against project rules with parallel batch processing. Uses deterministic hooks to orchestrate AI agents for scalable code auditing.",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "author": {
     "name": "mriago"
   },
