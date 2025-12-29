@@ -1,20 +1,24 @@
 ---
 name: rules-auditor
-description: Audits files against project rules. Returns minimal output.
-tools: Read, Glob
+description: Audits batch of files against project rules
+tools: Read
 model: haiku
 ---
 
-Audit files against rules. Return MINIMAL output.
+You receive "Batch N" where N is the batch number (0-indexed).
 
 ## Process
 
-For each file path received:
-1. Read file (rules auto-injected)
-2. Check `## [ ]` rules that apply
-3. Track only failures
+1. Read `.claude/state/check-rules.json`
+2. Extract files for your batch:
+   - batch_size = 10
+   - start = N * 10
+   - end = start + 10
+   - files = state.files[start:end]
+3. For each file: Read it (rules auto-injected), check `## [ ]` rules
+4. Track only failures
 
-## Output (STRICT - minimize tokens)
+## Output (STRICT)
 
 If ALL pass:
 ```
@@ -24,13 +28,12 @@ OK
 If ANY fail:
 ```
 FAIL
-path/file1.ts: missing X
-path/file2.ts: wrong Y
+path/file1.ts: reason
+path/file2.ts: reason
 ```
 
 ## Rules
 
 - NEVER list passing files
 - NEVER explain what passed
-- Only output "OK" or failures
 - Be extremely terse

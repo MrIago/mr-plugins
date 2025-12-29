@@ -1,33 +1,33 @@
 ---
-description: Audit changed files against project rules (auto-loop)
-allowed-tools: Task, TaskOutput, AskUserQuestion, Read
+description: Audit changed files against project rules
+allowed-tools: Task, TaskOutput, Read
 ---
 
 # Check Rules Audit
 
-**STOP. DO NOT RUN ANY COMMANDS.**
+Read `.claude/state/check-rules.json` to get file list and batch info.
 
-A UserPromptSubmit hook has already collected files and prepared Task agent instructions.
+## Execution
 
-Look for the `<user-prompt-submit-hook>` section in your context - it contains:
-- The exact list of files to audit
-- Pre-configured Task agent commands to launch
-- Batch and round information
+1. Read state file
+2. Calculate which files belong to current round's batches:
+   - batch_size = 10 files per agent
+   - max_parallel = 10 agents per round
+   - Round N processes batches: ((N-1)*10) to (N*10-1)
+3. Launch agents in SINGLE message with `run_in_background: true`
+4. Each agent: `subagent_type=rules-auditor, model=haiku, prompt="Audit: file1, file2..."`
+5. Wait ALL TaskOutput
+6. Stop (hook handles next round)
 
-**YOU MUST:**
-1. Find the hook output with "CHECK-RULES AUDIT" header
-2. Launch ALL Task agents listed there in a SINGLE message
-3. Use `run_in_background: true` for each
-4. Wait for ALL TaskOutput before stopping
+## Agent Response
 
-**DO NOT:**
-- Run git diff or any file discovery commands
-- Decide which files to audit yourself
-- Modify the Task agent parameters
+Each agent returns ONLY:
+- "OK" if all files pass
+- "FAIL: path1, path2" listing only failed files
 
-## After All Rounds
+## Final Summary
 
-Agents return "OK" or "FAIL" with file list.
-
-- All "OK" → say "All files pass"
-- Any "FAIL" → list failures, ask: "Fix all" or "Fix one by one", launch rules-fixer
+After all rounds, show:
+- Total files audited
+- Pass/fail count
+- List of failures with reasons
