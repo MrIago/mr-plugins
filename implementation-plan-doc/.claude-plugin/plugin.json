@@ -1,0 +1,18 @@
+{
+  "name": "implementation-plan-doc",
+  "description": "Creates structured implementation plan documents with technical context for LLMs. Use when planning features, migrations, or architectural changes.",
+  "version": "1.0.0",
+  "author": {
+    "name": "mriago"
+  },
+  "repository": "https://github.com/MrIago/mr-plugins",
+  "license": "MIT",
+  "keywords": [
+    "implementation",
+    "planning",
+    "documentation",
+    "architecture",
+    "technical-design",
+    "llm-context"
+  ]
+}

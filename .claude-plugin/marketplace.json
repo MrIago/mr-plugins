@@ -40,6 +40,17 @@
       },
       "keywords": ["cloudflare", "workers", "durable-objects", "queues", "workflows", "hyperdrive", "wrangler"],
       "category": "reference"
+    },
+    {
+      "name": "implementation-plan-doc",
+      "source": "./implementation-plan-doc",
+      "description": "Creates structured implementation plan documents with technical context for LLMs",
+      "version": "1.0.0",
+      "author": {
+        "name": "mriago"
+      },
+      "keywords": ["implementation", "planning", "documentation", "architecture", "technical-design"],
+      "category": "documentation"
     }
   ]
 }
